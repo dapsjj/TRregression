@@ -2,6 +2,8 @@
 import MeCab
 import re
 import collections
+import numpy as np
+import pandas as pd
 import pymssql
 import datetime
 import time
@@ -135,6 +137,9 @@ def closeConn():
     except Exception as ex:
         logger.error("Call method closeConn() error!")
         raise ex
+    finally:
+        cur.close()
+        conn.close()
 
 def get_report_keyword_property_list():
     global start_year
@@ -252,8 +257,40 @@ def no_need_keyword_remove():
     return keepWordList3
 
 
+def calculate_average_frequency():
+    df = pd.DataFrame(report_keyword_property_list)
+    average_frequency = df.iloc[:, 2].mean() #下标2是頻度合計
+    return average_frequency
 
 
+def calculate_frequency_standard_deviation():
+    df = pd.DataFrame(report_keyword_property_list)
+    sum_frequency = df.iloc[:, 2]#下标2是頻度合計
+    standard_deviation = np.std(sum_frequency, ddof=1)
+    return standard_deviation
+
+
+def set_generate_year_generate_week():
+    global generate_year
+    global generate_week
+    if not generate_year or not generate_week:
+        year_week = "%s-W%s" % (current_year, current_week)
+        year_month_day = datetime.datetime.strptime(year_week + '-0', "%Y-W%W-%w")
+        generate_year = (year_month_day - datetime.timedelta(weeks=int(1))).strftime('%Y')
+        generate_week = (year_month_day - datetime.timedelta(weeks=int(1))).strftime('%V')
+
+
+def calculate_frequency_deviation_value():
+    deviation_constant1 = 50
+    deviation_constant2 = 10
+    for i in range(len(report_keyword_property_list)):
+        keyword_frequency_deviation = deviation_constant1+(report_keyword_property_list[i][2]-keyword_frequency_avg)/keyword_frequency_offet*deviation_constant2
+        report_keyword_property_list[i].append(keyword_frequency_deviation)
+    return report_keyword_property_list
+
+
+def insert_into_importance_frequency():
+    pass
 
 
 
@@ -277,15 +314,22 @@ if __name__=="__main__":
     str_start_year_week = None
     str_end_year_week = None
     getConn()#数据库连接对象
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")#系统当前日期
-    current_year,current_week = get_year_week_from_Mst_date(current_date)#从Mst_date获取当前年和周
-    read_dateConfig_file_set_year_week()  # 读配置文件设置report_year和report_week
-    report_keyword_property_list = get_report_keyword_property_list()
-    report_keyword_property_list = no_need_keyword_remove()
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d") #系统当前日期
+    current_year,current_week = get_year_week_from_Mst_date(current_date) #从Mst_date获取当前年和周
+    read_dateConfig_file_set_year_week()  # 读配置文件设置参数
+    set_generate_year_generate_week() #设置generate_year和generate_week,如果generate_year为空或者generate_week为空,则取当前日期对应的年和周前一周所在的年和周
+    report_keyword_property_list = get_report_keyword_property_list() #从数据库取出指定年周的数据
+    report_keyword_property_list = no_need_keyword_remove() #去掉没有用的关键字
+    keyword_frequency_avg = calculate_average_frequency() #用"頻度合計"计算"頻度平均"
+    keyword_frequency_offet = calculate_frequency_standard_deviation() #用"頻度合計"计算"頻度標準偏差"
+    report_keyword_property_list = calculate_frequency_deviation_value() #頻度偏差値=50+(某一列的頻度合計-頻度平均)/頻度標準偏差*10
+    insert_into_importance_frequency() #插入到表"重要度頻度",字段提出年、週、id、キーワード	、詞性、頻度、重要度、頻度偏差値
     logger.info("start year week:" + str_start_year_week)
     logger.info("end year week:" + str_end_year_week)
     logger.info("affiliationk:" + affiliation)
     logger.info("continue_weeks:" + continue_weeks)
+    logger.info("generate_year:" + generate_year)
+    logger.info("generate_week:" + generate_week)
     closeConn()
     time_end = datetime.datetime.now()
     end = time.clock()
