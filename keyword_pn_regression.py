@@ -7,6 +7,7 @@ import pandas as pd
 import pymssql
 import datetime
 import time
+from sklearn.linear_model import LinearRegression
 import logging
 import os
 import configparser
@@ -257,16 +258,18 @@ def no_need_keyword_remove():
     return keepWordList3
 
 
-def calculate_average_frequency():
-    df = pd.DataFrame(report_keyword_property_list)
-    average_frequency = df.iloc[:, 2].mean() #下标2是頻度合計
-    return average_frequency
+def calculate_average(paraList,index):
+    # df = pd.DataFrame(report_keyword_property_list)
+    df = pd.DataFrame(paraList)
+    average_value = df.iloc[:, index].mean() #下标2是頻度合計
+    return average_value
 
 
-def calculate_frequency_standard_deviation():
-    df = pd.DataFrame(report_keyword_property_list)
-    sum_frequency = df.iloc[:, 2]#下标2是頻度合計
-    standard_deviation = np.std(sum_frequency, ddof=1)
+def calculate_standard_deviation(paraList,index):
+    # df = pd.DataFrame(report_keyword_property_list)
+    df = pd.DataFrame(paraList)
+    colum_value = df.iloc[:, index]#下标2是頻度合計
+    standard_deviation = np.std(colum_value, ddof=1)
     return standard_deviation
 
 
@@ -289,8 +292,109 @@ def calculate_frequency_deviation_value():
     return report_keyword_property_list
 
 
-def insert_into_importance_frequency():
-    pass
+def delete_data_from_importance_frequency_deviation():
+    try:
+        sql = ' delete from 重要度頻度 where report_year = %s and report_week = %s' \
+              % (generate_year, generate_week)
+        cur.execute(sql)
+        conn.commit()
+    except pymssql.Error as ex:
+        logger.error("dbException:" + str(ex))
+        raise ex
+    except Exception as ex:
+        logger.error("Call method delete_data_from_importance_frequency_deviation() error!")
+        logger.error("Exception:" + str(ex))
+        conn.rollback()
+        raise ex
+
+
+def insert_into_importance_frequency_deviation():
+    global insert_importance_frequency_deviation_list
+    if report_keyword_property_list:
+        try:
+            insert_importance_frequency_deviation_list = [tuple([generate_year, generate_week, *item]) for item in report_keyword_property_list]
+            sql = ' insert into 重要度頻度 (report_year, report_week, keyword, property, keyword_frequency	, importance_degree, keyword_frequency_offet) ' \
+                  ' values(%s,%s,%s,%s,%s,%s,%s) '
+            cur.executemany(sql, insert_importance_frequency_deviation_list)
+            conn.commit()
+        except pymssql.Error as ex:
+            logger.error("dbException:" + str(ex))
+            raise ex
+        except Exception as ex:
+            logger.error("Call method insert_into_importance_frequency() error!")
+            logger.error("Exception:" + str(ex))
+            conn.rollback()
+            raise ex
+
+
+def calculate_Intercept_X_Variable():
+    global insert_importance_frequency_deviation_list
+    df = pd.DataFrame(insert_importance_frequency_deviation_list)
+    X = df.iloc[:, 5]
+    y = df.iloc[:, 6]
+    X = X.values.reshape(-1, 1)
+    y = y.values.reshape(-1, 1)
+    clf = LinearRegression()
+    para_Intercept = clf.intercept_[0]
+    para_X_Variable_1 = clf.coef_[0][0]
+    clf.fit(X, y)
+    return para_Intercept,para_X_Variable_1
+
+
+def delete_data_from_importance_classification():
+    try:
+        sql = ' delete from 重要度分類 where report_year = %s and report_week = %s' \
+              % (generate_year, generate_week)
+        cur.execute(sql)
+        conn.commit()
+    except pymssql.Error as ex:
+        logger.error("dbException:" + str(ex))
+        raise ex
+    except Exception as ex:
+        logger.error("Call method delete_data_from_importance_classification() error!")
+        logger.error("Exception:" + str(ex))
+        conn.rollback()
+        raise ex
+
+
+def generate_year_week_keyword_property_list():
+    property_list = []
+    temp_importance_classification_list = report_keyword_property_list.copy()
+    for item in temp_importance_classification_list:
+        property_list.append([generate_year,generate_week,item[0],item[1]])
+    return property_list
+
+
+
+
+def calculate_importance_classification(property_list):
+    importance_classification_list = property_list.copy()
+    if len(importance_classification_list) == len(report_keyword_property_list):
+        for i in range(len(report_keyword_property_list)):
+            importance_degree_g = float(report_keyword_property_list[i][3])*X_Variable_1 + Coefficients_Intercept
+            importance_classification_list[i].append(importance_degree_g)
+        return importance_classification_list
+
+
+
+
+def insert_into_importance_classification(importance_classification_list):
+    if importance_classification_list:
+        importance_classification_list = [tuple(item) for item in importance_classification_list ]
+        try:
+            sql = ' insert into 重要度分類 (report_year, report_week, keyword, property, importance_degree_g) ' \
+                  ' values(%s,%s,%s,%s,%s) '
+            cur.executemany(sql, importance_classification_list)
+            conn.commit()
+        except pymssql.Error as ex:
+            logger.error("dbException:" + str(ex))
+            raise ex
+        except Exception as ex:
+            logger.error("Call method insert_into_importance_classification() error!")
+            logger.error("Exception:" + str(ex))
+            conn.rollback()
+            raise ex
+
 
 
 
@@ -318,12 +422,20 @@ if __name__=="__main__":
     current_year,current_week = get_year_week_from_Mst_date(current_date) #从Mst_date获取当前年和周
     read_dateConfig_file_set_year_week()  # 读配置文件设置参数
     set_generate_year_generate_week() #设置generate_year和generate_week,如果generate_year为空或者generate_week为空,则取当前日期对应的年和周前一周所在的年和周
+    insert_importance_frequency_deviation_list = []
     report_keyword_property_list = get_report_keyword_property_list() #从数据库取出指定年周的数据
     report_keyword_property_list = no_need_keyword_remove() #去掉没有用的关键字
-    keyword_frequency_avg = calculate_average_frequency() #用"頻度合計"计算"頻度平均"
-    keyword_frequency_offet = calculate_frequency_standard_deviation() #用"頻度合計"计算"頻度標準偏差"
+    keyword_frequency_avg = calculate_average(report_keyword_property_list,2) #用"頻度合計"计算"頻度平均"
+    keyword_frequency_offet = calculate_standard_deviation(report_keyword_property_list,2) #用"頻度合計"计算"頻度標準偏差"
     report_keyword_property_list = calculate_frequency_deviation_value() #頻度偏差値=50+(某一列的頻度合計-頻度平均)/頻度標準偏差*10
-    insert_into_importance_frequency() #插入到表"重要度頻度",字段提出年、週、id、キーワード	、詞性、頻度、重要度、頻度偏差値
+    delete_data_from_importance_frequency_deviation() #插入到"重要度頻度"前先删除数据
+    insert_into_importance_frequency_deviation() #插入到表"重要度頻度",字段"提出年"、"週"、"id"、"キーワード"、"詞性"、"頻度"、"重要度"、"頻度偏差値"
+    Coefficients_Intercept,X_Variable_1 = calculate_Intercept_X_Variable() #用"頻度偏差値"和"重要度"做回帰分析,计算出"切片"(Coefficients_Intercept)和"X"(Coefficients_X_Variable_1)
+    year_week_keyword_property_list = generate_year_week_keyword_property_list()#生成年、周、关键字、词性的List
+    report_importance_classification_list = calculate_importance_classification(year_week_keyword_property_list) #重要度分类=重要度*X+切片
+    delete_data_from_importance_classification()  # 插入到表"重要度分類"前删除数据
+    insert_into_importance_classification(report_importance_classification_list)#插入到表"重要度分類",字段"提出年"、"週"、"キーワード"、"詞性"、"重要度分類"
+
     logger.info("start year week:" + str_start_year_week)
     logger.info("end year week:" + str_end_year_week)
     logger.info("affiliationk:" + affiliation)
