@@ -511,8 +511,36 @@ def insert_into_employee_negative_positive(employee_negative_positive_list):
             raise ex
 
 
+def delete_data_from_parameter():
+    try:
+        sql = ' delete from パラメータ where report_year = %s and report_week = %s' \
+              % (generate_year, generate_week)
+        cur.execute(sql)
+        conn.commit()
+    except pymssql.Error as ex:
+        logger.error("dbException:" + str(ex))
+        raise ex
+    except Exception as ex:
+        logger.error("Call method delete_data_from_parameter() error!")
+        logger.error("Exception:" + str(ex))
+        conn.rollback()
+        raise ex
 
-
+def insert_into_parameter(set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_Coefficients_Intercept,para_X_Variable_1):
+    try:
+        sql = ' insert into パラメータ (report_year, report_week, keyword_frequency_avg, keyword_frequency_offet, importance_degree_g_avg, importance_degree_g_offet, adjustment, Coefficients_Intercept, Coefficients_X_Variable_1) ' \
+              ' values(%s,%s,%s,%s,%s,%s,%s,%s,%s) ' \
+              % (set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_Coefficients_Intercept,para_X_Variable_1)
+        cur.execute(sql)
+        conn.commit()
+    except pymssql.Error as ex:
+        logger.error("dbException:" + str(ex))
+        raise ex
+    except Exception as ex:
+        logger.error("Call method insert_into_parameter() error!")
+        logger.error("Exception:" + str(ex))
+        conn.rollback()
+        raise ex
 
 
 
@@ -560,12 +588,15 @@ if __name__=="__main__":
     year_week_employee_negative_positive_list = calculate_negative_positive_value(generate_year,generate_week) #用生成的字典计算ネガポジ_個人別
     delete_data_from_employee_negative_positive() #插入到表"ネガポジ_個人別"前删除数据
     insert_into_employee_negative_positive(year_week_employee_negative_positive_list) #插入到表"重要度分類",字段"提出年"、"週"、"社員番号"、"キーワード"、"ネガ値"、"ポジ値"
+    delete_data_from_parameter() #插入到表"パラメータ"前删除数据
+    insert_into_parameter(generate_year,generate_week,keyword_frequency_avg,keyword_frequency_offet,importance_degree_g_avg,importance_degree_g_offet,adjustment,Coefficients_Intercept,X_Variable_1) #插入到表"パラメータ",字段"提出年"、"週"、"頻度平均"、"頻度標準偏差"、"重要度分類平均"、"重要度分類標準偏差"、"調整引数"、"Coefficients_Intercept"、"Coefficients_X_Variable_1"
     logger.info("start year week:" + str_start_year_week)
     logger.info("end year week:" + str_end_year_week)
     logger.info("affiliationk:" + affiliation)
     logger.info("continue_weeks:" + continue_weeks)
     logger.info("generate_year:" + generate_year)
     logger.info("generate_week:" + generate_week)
+    print(keyword_frequency_avg,keyword_frequency_offet,importance_degree_g_avg,importance_degree_g_offet,Coefficients_Intercept,X_Variable_1)
     closeConn()
     time_end = datetime.datetime.now()
     end = time.clock()
