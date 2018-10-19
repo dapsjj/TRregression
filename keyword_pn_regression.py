@@ -448,6 +448,72 @@ def insert_into_pn_dictionary(pn_list):
             raise ex
 
 
+def calculate_negative_positive_value(set_year,set_week):
+    if set_year and set_week:
+        try:
+            sql = " select t1.report_year as '年', " \
+                  " t1.report_week as '週', " \
+                  " t1.employee_code as '社員番号', " \
+                  " SUM(CASE WHEN  t2.pn<0 THEN  t2.pn ELSE 0 END) AS 'ネガ合計', " \
+                  " SUM(CASE WHEN t2.pn>0 THEN t2.pn ELSE 0 END) AS 'ポジ合計' " \
+                  " from report_keyword_property t1 inner join ネガポジ辞書 t2 on t1.keyword=t2.keyword " \
+                  " where t1.report_year =%s and t1.report_week =%s " \
+                  " and t2.report_year =%s and t2.report_week =%s " \
+                  " group by t1.report_year,t1.report_week,t1.employee_code " \
+                  " order by t1.report_year,t1.report_week,t1.employee_code " \
+                  % (set_year, set_week, set_year, set_week)
+            cur.execute(sql)
+            rows = cur.fetchall()
+            if rows:
+                negative_positive_list = [list(row) for row in rows]
+                return negative_positive_list
+            else:
+                return ""
+        except pymssql.Error as ex:
+            logger.error("dbException:" + str(ex))
+            raise ex
+        except Exception as ex:
+            logger.error("Call method calculate_negative_positive_value() error!")
+            logger.error("Exception:" + str(ex))
+            raise ex
+
+def delete_data_from_employee_negative_positive():
+    try:
+        sql = ' delete from ネガポジ_個人別 where report_year = %s and report_week = %s' \
+              % (generate_year, generate_week)
+        cur.execute(sql)
+        conn.commit()
+    except pymssql.Error as ex:
+        logger.error("dbException:" + str(ex))
+        raise ex
+    except Exception as ex:
+        logger.error("Call method delete_data_from_employee_negative_positive() error!")
+        logger.error("Exception:" + str(ex))
+        conn.rollback()
+        raise ex
+
+
+def insert_into_employee_negative_positive(employee_negative_positive_list):
+    if employee_negative_positive_list:
+        keyword_pn_list = [tuple(item) for item in employee_negative_positive_list ]
+        try:
+            sql = ' insert into ネガポジ_個人別 (report_year, report_week, employeecode, negative, positive) ' \
+                  ' values(%s,%s,%s,%s,%s) '
+            cur.executemany(sql, keyword_pn_list)
+            conn.commit()
+        except pymssql.Error as ex:
+            logger.error("dbException:" + str(ex))
+            raise ex
+        except Exception as ex:
+            logger.error("Call method insert_into_employee_negative_positive() error!")
+            logger.error("Exception:" + str(ex))
+            conn.rollback()
+            raise ex
+
+
+
+
+
 
 
 if __name__=="__main__":
@@ -473,7 +539,6 @@ if __name__=="__main__":
     current_year,current_week = get_year_week_from_Mst_date(current_date) #从Mst_date获取当前年和周
     read_dateConfig_file_set_year_week()  # 读配置文件设置参数
     set_generate_year_generate_week() #设置generate_year和generate_week,如果generate_year为空或者generate_week为空,则取当前日期对应的年和周前一周所在的年和周
-    insert_importance_frequency_deviation_list = []
     report_keyword_property_list = get_report_keyword_property_list() #从数据库取出指定年周的数据
     report_keyword_property_list = no_need_keyword_remove() #去掉没有用的关键字
     keyword_frequency_avg = calculate_average(report_keyword_property_list,2) #用"頻度合計"计算"頻度平均"
@@ -484,14 +549,17 @@ if __name__=="__main__":
     Coefficients_Intercept,X_Variable_1 = calculate_Intercept_X_Variable(list_for_calculate_Coefficients_Intercept_X_Variable_1) #用"頻度偏差値"和"重要度"做回帰分析,计算出"切片"(Coefficients_Intercept)和"X"(Coefficients_X_Variable_1)
     year_week_keyword_property_list = generate_year_week_keyword_property_list()#生成年、周、关键字、词性的List
     report_importance_classification_list = calculate_importance_classification_value(year_week_keyword_property_list) #重要度分类=重要度*X+切片,计算出这个值后加入到report_importance_classification_list中
-    delete_data_from_importance_classification()  # 插入到表"重要度分類"前删除数据
+    delete_data_from_importance_classification()  #插入到表"重要度分類"前删除数据
     insert_into_importance_classification(report_importance_classification_list)#插入到表"重要度分類",字段"提出年"、"週"、"キーワード"、"詞性"、"重要度分類"
     importance_degree_g_avg = calculate_average(report_importance_classification_list,4) #用"重要度分類"计算"重要度平均",通常是50
     importance_degree_g_offet = calculate_standard_deviation(report_importance_classification_list,4) #用"重要度分類"计算"重要度分類標準偏差"
     adjustment = calculate_adjustment(report_importance_classification_list) #计算調整引数(常量),調整引数(常量)=(重要度分類最大值-重要度平均)*重要度分類標準偏差
     report_keyword_pn_list = calculate_pn_value(report_importance_classification_list) #ネガポジ值=(重要度分類 - 重要度平均)/计算調整引数(常量)*重要度分類標準偏差,计算出这个值后加入到report_keyword_pn_list中
-    delete_data_from_pn_dictionary()  # 插入到表"ネガポジ辞書"前删除数据
+    delete_data_from_pn_dictionary()  #插入到表"ネガポジ辞書"前删除数据
     insert_into_pn_dictionary(report_keyword_pn_list) #插入到表"ネガポジ辞書",字段"提出年"、"週"、"キーワード"、"詞性"、ネガポジ値"
+    year_week_employee_negative_positive_list = calculate_negative_positive_value(generate_year,generate_week) #用生成的字典计算ネガポジ_個人別
+    delete_data_from_employee_negative_positive() #插入到表"ネガポジ_個人別"前删除数据
+    insert_into_employee_negative_positive(year_week_employee_negative_positive_list) #插入到表"重要度分類",字段"提出年"、"週"、"社員番号"、"キーワード"、"ネガ値"、"ポジ値"
     logger.info("start year week:" + str_start_year_week)
     logger.info("end year week:" + str_end_year_week)
     logger.info("affiliationk:" + affiliation)
