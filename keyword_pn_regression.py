@@ -643,7 +643,7 @@ def calculate_negative_positive_value(set_year,set_week):
                   " t1.employee_code as '社員番号', " \
                   " SUM(CASE WHEN  t2.pn<0 THEN  t2.pn ELSE 0 END) AS 'ネガ合計', " \
                   " SUM(CASE WHEN t2.pn>0 THEN t2.pn ELSE 0 END) AS 'ポジ合計' " \
-                  " from report_keyword_property t1 inner join ネガポジ辞書 t2 on t1.keyword=t2.keyword  and t1.free1=t2.property " \
+                  " from report_keyword_property t1 inner join ネガポジ辞書 t2 on t1.keyword=t2.keyword  " \
                   " where t1.report_year =%s and t1.report_week =%s " \
                   " and t2.report_year =%s and t2.report_week =%s " \
                   " group by t1.report_year,t1.report_week,t1.employee_code " \
