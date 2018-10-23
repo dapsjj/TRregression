@@ -276,6 +276,7 @@ def no_need_keyword_remove():
     keepWordList1=[]
     keepWordList2=[]
     keepWordList3=[]
+    removeList=[]
     if report_keyword_property_list:
         try:
             for item1 in report_keyword_property_list:
@@ -292,6 +293,7 @@ def no_need_keyword_remove():
                 for mark2 in no_need_words2: #["っ","ぁ","ぃ","ぅ","ぇ","ヶ"]
                     if item2[0].startswith(mark2) or item2[0].endswith(mark2):
                         flag2 = True
+                        break
                 if flag2 == False:
                     keepWordList2.append(item2)
 
@@ -299,10 +301,9 @@ def no_need_keyword_remove():
                 if item3[0] in keep_words1: # ["ccc","CCC"]
                     keepWordList3.append(item3)
                 else:
-                    str_repeat_list=[]
-                    if len(str_repeat_list)<3: #长度小于3的词加入到List
+                    if len(item3[0])<3: #长度小于3的词加入到List
                         keepWordList3.append(item3)
-                    elif len(str_repeat_list)>=3: #长度大于3的词
+                    elif len(item3[0])>=3: #长度大于3的词
                         str_repeat_list = [everyChar for everyChar in item3[0]] #把词中的每一个字放到str_repeat_list
                         str_repeat_list = list(set(str_repeat_list)) #利用set特性去重
                         if len(str_repeat_list)>1: #不全是同一个字符则加入到List中
@@ -767,7 +768,6 @@ if __name__=="__main__":
     start = time.clock()
     logger.info("Program start,now time is:"+str(time_start))
     server,user,password,database = read_dateConfig_file_set_database()#读取配置文件中的数据库信息
-
     getConn()#数据库连接对象
     current_date = datetime.datetime.now().strftime("%Y-%m-%d") #系统当前日期
     current_year,current_week = get_year_week_from_Mst_date(current_date) #从Mst_date获取当前年和周
@@ -802,7 +802,6 @@ if __name__=="__main__":
     logger.info("continue_weeks:" + continue_weeks)
     logger.info("generate_year:" + generate_year)
     logger.info("generate_week:" + generate_week)
-    print(keyword_frequency_avg,keyword_frequency_offet,importance_degree_g_avg,importance_degree_g_offet,Coefficients_Intercept,X_Variable_1)
     closeConn()
     time_end = datetime.datetime.now()
     end = time.clock()
