@@ -276,7 +276,6 @@ def no_need_keyword_remove():
     keepWordList1=[]
     keepWordList2=[]
     keepWordList3=[]
-    removeList=[]
     if report_keyword_property_list:
         try:
             for item1 in report_keyword_property_list:
