@@ -227,7 +227,7 @@ def get_data_from_report_keyword_property(para_start_year,para_start_week,para_e
         str_end_year_week=para_end_year + para_end_week
         if para_affiliation:
             sql = " select distinct keyword as '辞書'," \
-                  " min(free1) as '詞性'," \
+                  " free1 as '詞性'," \
                   " sum(keyword_frequency) as '頻度合計'," \
                   " avg(importance_degree) as '重要度'" \
                   " from [TRIAL].[dbo].[report_keyword_property] t1 " \
@@ -237,17 +237,17 @@ def get_data_from_report_keyword_property(para_start_year,para_start_week,para_e
                   " on t2.EmployeeManagementID=t3.EmployeeManagementID " \
                   " where cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
                   " and t3.Affiliation=%s " \
-                  " group by keyword " \
+                  " group by keyword,free1 " \
                   " order by '重要度' desc,'頻度合計' desc" \
                   % (str_start_year_week, str_end_year_week,para_affiliation)
         else:
             sql = " select distinct keyword as '辞書'," \
-                  " min(free1) as '詞性'," \
+                  " free1 as '詞性'," \
                   " sum(keyword_frequency) as '頻度合計'," \
                   " avg(importance_degree) as '重要度'" \
                   " from [TRIAL].[dbo].[report_keyword_property] " \
                   " where cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
-                  " group by keyword " \
+                  " group by keyword,free1 " \
                   " order by '重要度' desc,'頻度合計' desc" \
                   % (str_start_year_week, str_end_year_week)
         cur.execute(sql)
@@ -395,10 +395,10 @@ def calculate_frequency_deviation_value():
 
 def delete_data_from_importance_frequency_deviation():
     '''
-    从"重要度頻度"表，删除生成年、生成周对应的数据
+    从"report_importance_frequency"表，删除生成年、生成周对应的数据
     '''
     try:
-        sql = ' delete from 重要度頻度 where report_year = %s and report_week = %s' \
+        sql = ' delete from report_importance_frequency where report_year = %s and report_week = %s' \
               % (generate_year, generate_week)
         cur.execute(sql)
         conn.commit()
@@ -414,13 +414,13 @@ def delete_data_from_importance_frequency_deviation():
 
 def insert_into_importance_frequency_deviation():
     '''
-    插入数据到表"重要度頻度"
+    插入数据到表"report_importance_frequency"
     :return:增加了生成年、生成周后的List
     '''
     if report_keyword_property_list:
         try:
             insert_importance_frequency_deviation_list = [tuple([generate_year, generate_week, *item]) for item in report_keyword_property_list]
-            sql = ' insert into 重要度頻度 (report_year, report_week, keyword, property, keyword_frequency	, importance_degree, keyword_frequency_offet) ' \
+            sql = ' insert into report_importance_frequency (report_year, report_week, keyword, property, keyword_frequency	, importance_degree, keyword_frequency_offet) ' \
                   ' values(%s,%s,%s,%s,%s,%s,%s) '
             cur.executemany(sql, insert_importance_frequency_deviation_list)
             conn.commit()
@@ -453,6 +453,13 @@ def calculate_Intercept_X_Variable(para_list):
             y = y.values.reshape(-1, 1)
             clf = LinearRegression()
             clf.fit(X, y)
+            '''
+            yhat = clf.predict(X)
+            SS_Residual = sum((y - yhat) ** 2)
+            SS_Total = sum((y - np.mean(y)) ** 2)
+            r_squared = 1 - (float(SS_Residual)) / SS_Total
+            # adjusted_r_squared = 1 - (1 - r_squared) * (len(y) - 1) / (len(y) - X.shape[1] - 1)
+            '''
             para_Intercept = clf.intercept_[0]
             para_X_Variable_1 = clf.coef_[0][0]
             return para_Intercept,para_X_Variable_1
@@ -470,7 +477,7 @@ def delete_data_from_importance_classification():
     从"重要度分類"表，删除生成年、生成周对应的数据
     '''
     try:
-        sql = ' delete from 重要度分類 where report_year = %s and report_week = %s' \
+        sql = ' delete from report_importance_classification where report_year = %s and report_week = %s' \
               % (generate_year, generate_week)
         cur.execute(sql)
         conn.commit()
@@ -520,13 +527,13 @@ def calculate_importance_classification_value(property_list):
 
 def insert_into_importance_classification(importance_classification_list):
     '''
-    插入到表"重要度分類"
+    插入到表"report_importance_classification"
     :param importance_classification_list:要处理的List
     '''
     if importance_classification_list:
         importance_classification_list = [tuple(item) for item in importance_classification_list ]
         try:
-            sql = ' insert into 重要度分類 (report_year, report_week, keyword, property, importance_degree_g) ' \
+            sql = ' insert into report_importance_classification (report_year, report_week, keyword, property, importance_degree_g) ' \
                   ' values(%s,%s,%s,%s,%s) '
             cur.executemany(sql, importance_classification_list)
             conn.commit()
@@ -587,10 +594,10 @@ def calculate_pn_value(importance_classification_list):
 
 def delete_data_from_pn_dictionary():
     '''
-    从"ネガポジ辞書"表，删除生成年、生成周对应的数据
+    从"report_negative_positive_dict"表，删除生成年、生成周对应的数据
     '''
     try:
-        sql = ' delete from ネガポジ辞書 where report_year = %s and report_week = %s' \
+        sql = ' delete from report_negative_positive_dict where report_year = %s and report_week = %s' \
               % (generate_year, generate_week)
         cur.execute(sql)
         conn.commit()
@@ -606,13 +613,13 @@ def delete_data_from_pn_dictionary():
 
 def insert_into_pn_dictionary(pn_list):
     '''
-    插入到表"ネガポジ辞書"
+    插入到表"report_negative_positive_dict"
     :param pn_list:要处理的List
     '''
     if pn_list:
         keyword_pn_list = [tuple(item) for item in pn_list ]
         try:
-            sql = ' insert into ネガポジ辞書 (report_year, report_week, keyword, property, pn) ' \
+            sql = ' insert into report_negative_positive_dict (report_year, report_week, keyword, property, pn) ' \
                   ' values(%s,%s,%s,%s,%s) '
             cur.executemany(sql, keyword_pn_list)
             conn.commit()
@@ -643,7 +650,7 @@ def calculate_negative_positive_value(set_year,set_week):
                   " t1.employee_code as '社員番号', " \
                   " SUM(CASE WHEN  t2.pn<0 THEN  t2.pn ELSE 0 END) AS 'ネガ合計', " \
                   " SUM(CASE WHEN t2.pn>0 THEN t2.pn ELSE 0 END) AS 'ポジ合計' " \
-                  " from report_keyword_property t1 inner join ネガポジ辞書 t2 on t1.keyword=t2.keyword  " \
+                  " from report_keyword_property t1 inner join report_negative_positive_dict t2 on t1.keyword=t2.keyword and t1.free1=t2.property " \
                   " where t1.report_year =%s and t1.report_week =%s " \
                   " and t2.report_year =%s and t2.report_week =%s " \
                   " group by t1.report_year,t1.report_week,t1.employee_code " \
@@ -673,7 +680,7 @@ def delete_data_from_employee_negative_positive():
     从"ネガポジ_個人別"表，删除生成年、生成周对应的数据
     '''
     try:
-        sql = ' delete from ネガポジ_個人別 where report_year = %s and report_week = %s' \
+        sql = ' delete from report_negative_positive_personal where report_year = %s and report_week = %s' \
               % (generate_year, generate_week)
         cur.execute(sql)
         conn.commit()
@@ -689,13 +696,13 @@ def delete_data_from_employee_negative_positive():
 
 def insert_into_employee_negative_positive(employee_negative_positive_list):
     '''
-    插入到表"ネガポジ_個人別"
+    插入到表"report_negative_positive_personal"
     :param employee_negative_positive_list:要处理的List
     '''
     if employee_negative_positive_list:
         keyword_pn_list = [tuple(item) for item in employee_negative_positive_list ]
         try:
-            sql = ' insert into ネガポジ_個人別 (report_year, report_week, employeecode, negative, positive) ' \
+            sql = ' insert into report_negative_positive_personal (report_year, report_week, employeecode, negative, positive) ' \
                   ' values(%s,%s,%s,%s,%s) '
             cur.executemany(sql, keyword_pn_list)
             conn.commit()
@@ -714,10 +721,10 @@ def insert_into_employee_negative_positive(employee_negative_positive_list):
 
 def delete_data_from_parameter():
     '''
-    从"パラメータ"表，删除生成年、生成周对应的数据
+    从"report_parameter"表，删除生成年、生成周对应的数据
     '''
     try:
-        sql = ' delete from パラメータ where report_year = %s and report_week = %s' \
+        sql = ' delete from report_parameter where report_year = %s and report_week = %s' \
               % (generate_year, generate_week)
         cur.execute(sql)
         conn.commit()
@@ -733,7 +740,7 @@ def delete_data_from_parameter():
 
 def insert_into_parameter(set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_Coefficients_Intercept,para_X_Variable_1):
     '''
-    插入到表"パラメータ"
+    插入到表"report_parameter"
     :param set_year:生成年
     :param set_week:生成周
     :param para_keyword_frequency_avg:頻度平均
@@ -746,7 +753,7 @@ def insert_into_parameter(set_year,set_week,para_keyword_frequency_avg,para_keyw
     :return:
     '''
     try:
-        sql = ' insert into パラメータ (report_year, report_week, keyword_frequency_avg, keyword_frequency_offet, importance_degree_g_avg, importance_degree_g_offet, adjustment, Coefficients_Intercept, Coefficients_X_Variable_1) ' \
+        sql = ' insert into report_parameter (report_year, report_week, keyword_frequency_avg, keyword_frequency_offet, importance_degree_g_avg, importance_degree_g_offet, adjustment, Coefficients_Intercept, Coefficients_X_Variable_1) ' \
               ' values(%s,%s,%s,%s,%s,%s,%s,%s,%s) ' \
               % (set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_Coefficients_Intercept,para_X_Variable_1)
         cur.execute(sql)
@@ -777,24 +784,24 @@ if __name__=="__main__":
     keyword_frequency_avg = calculate_average(report_keyword_property_list,2) #用"頻度合計"计算"頻度平均"
     keyword_frequency_offet = calculate_standard_deviation(report_keyword_property_list,2) #用"頻度合計"计算"頻度標準偏差"
     report_keyword_property_list = calculate_frequency_deviation_value() #頻度偏差値=50+(某一列的頻度合計-頻度平均)/頻度標準偏差*10,计算出这个值后加入到report_keyword_property_list中
-    delete_data_from_importance_frequency_deviation() #插入到"重要度頻度"前先删除数据
-    list_for_calculate_Coefficients_Intercept_X_Variable_1=insert_into_importance_frequency_deviation() #插入到表"重要度頻度",字段"提出年"、"週"、"id"、"キーワード"、"詞性"、"頻度"、"重要度"、"頻度偏差値"
+    delete_data_from_importance_frequency_deviation() #插入到"report_importance_frequency"前先删除数据
+    list_for_calculate_Coefficients_Intercept_X_Variable_1=insert_into_importance_frequency_deviation() #插入到表"report_importance_frequency",字段"提出年"、"週"、"id"、"キーワード"、"詞性"、"頻度"、"重要度"、"頻度偏差値"
     Coefficients_Intercept,X_Variable_1 = calculate_Intercept_X_Variable(list_for_calculate_Coefficients_Intercept_X_Variable_1) #用"頻度偏差値"和"重要度"做回帰分析,计算出"切片"(Coefficients_Intercept)和"X"(Coefficients_X_Variable_1)
     year_week_keyword_property_list = generate_year_week_keyword_property_list() #生成年、周、关键字、词性的List
     report_importance_classification_list = calculate_importance_classification_value(year_week_keyword_property_list) #重要度分类=重要度*X+切片,计算出这个值后加入到report_importance_classification_list中
-    delete_data_from_importance_classification()  #插入到表"重要度分類"前删除数据
-    insert_into_importance_classification(report_importance_classification_list) #插入到表"重要度分類",字段"提出年"、"週"、"キーワード"、"詞性"、"重要度分類"
+    delete_data_from_importance_classification()  #插入到表"report_importance_classification"前删除数据
+    insert_into_importance_classification(report_importance_classification_list) #插入到表"report_importance_classification",字段"提出年"、"週"、"キーワード"、"詞性"、"report_importance_classification"
     importance_degree_g_avg = calculate_average(report_importance_classification_list,4) #用"重要度分類"计算"重要度平均",通常是50
     importance_degree_g_offet = calculate_standard_deviation(report_importance_classification_list,4) #用"重要度分類"计算"重要度分類標準偏差"
     adjustment = calculate_adjustment(report_importance_classification_list) #计算調整引数(常量),調整引数(常量)=(重要度分類最大值-重要度平均)*重要度分類標準偏差
     report_keyword_pn_list = calculate_pn_value(report_importance_classification_list) #ネガポジ值=(重要度分類 - 重要度平均)/计算調整引数(常量)*重要度分類標準偏差,计算出这个值后加入到report_keyword_pn_list中
-    delete_data_from_pn_dictionary()  #插入到表"ネガポジ辞書"前删除数据
-    insert_into_pn_dictionary(report_keyword_pn_list) #插入到表"ネガポジ辞書",字段"提出年"、"週"、"キーワード"、"詞性"、ネガポジ値"
+    delete_data_from_pn_dictionary()  #插入到表"report_negative_positive_dict"前删除数据
+    insert_into_pn_dictionary(report_keyword_pn_list) #插入到表"report_negative_positive_dict",字段"提出年"、"週"、"キーワード"、"詞性"、ネガポジ値"
     year_week_employee_negative_positive_list = calculate_negative_positive_value(generate_year,generate_week) #用生成的字典计算ネガポジ_個人別
-    delete_data_from_employee_negative_positive() #插入到表"ネガポジ_個人別"前删除数据
+    delete_data_from_employee_negative_positive() #插入到表"report_negative_positive_personal"前删除数据
     insert_into_employee_negative_positive(year_week_employee_negative_positive_list) #插入到表"重要度分類",字段"提出年"、"週"、"社員番号"、"キーワード"、"ネガ値"、"ポジ値"
-    delete_data_from_parameter() #插入到表"パラメータ"前删除数据
-    insert_into_parameter(generate_year,generate_week,keyword_frequency_avg,keyword_frequency_offet,importance_degree_g_avg,importance_degree_g_offet,adjustment,Coefficients_Intercept,X_Variable_1) #插入到表"パラメータ",字段"提出年"、"週"、"頻度平均"、"頻度標準偏差"、"重要度分類平均"、"重要度分類標準偏差"、"調整引数"、"Coefficients_Intercept"、"Coefficients_X_Variable_1"
+    delete_data_from_parameter() #插入到表"report_parameter"前删除数据
+    insert_into_parameter(generate_year,generate_week,keyword_frequency_avg,keyword_frequency_offet,importance_degree_g_avg,importance_degree_g_offet,adjustment,Coefficients_Intercept,X_Variable_1) #插入到表"report_parameter",字段"提出年"、"週"、"頻度平均"、"頻度標準偏差"、"重要度分類平均"、"重要度分類標準偏差"、"調整引数"、"Coefficients_Intercept"、"Coefficients_X_Variable_1"
     logger.info("start year week:" + str_start_year_week)
     logger.info("end year week:" + str_end_year_week)
     logger.info("affiliationk:" + affiliation)
