@@ -6,6 +6,7 @@ import pymssql
 import datetime
 import time
 from sklearn.linear_model import LinearRegression
+from scipy.stats import linregress
 import logging
 import os
 import configparser
@@ -17,7 +18,7 @@ keep_words1 = ["ccc","CCC"]
 
 conn = None  # 连接
 cur = None  # 游标
-affiliation = None  # 部署
+affiliated_company = None  # 部署
 start_year = None  # 开始年
 start_week = None  # 开始周
 end_year = None  # 结束年
@@ -79,7 +80,7 @@ def read_dateConfig_file_set_year_week():
     '''
     读dateConfig.ini,获取部署、开始年、开始周、结束年、结束周、生成年、生成周、持续周
     '''
-    global affiliation
+    global affiliated_company
     global start_year
     global start_week
     global end_year
@@ -92,7 +93,7 @@ def read_dateConfig_file_set_year_week():
         try:
             conf = configparser.ConfigParser()
             conf.read(os.path.join(os.path.dirname(__file__), "dateConfig.ini"), encoding="utf-8-sig")
-            affiliation = conf.get("affiliation", "affiliation")
+            affiliated_company = conf.get("affiliated_company", "affiliated_company")
             start_year = conf.get("start_year", "start_year")
             start_week = conf.get("start_week", "start_week")
             end_year = conf.get("end_year", "end_year")
@@ -186,7 +187,7 @@ def get_report_keyword_property_list():
                 start_week="0" + start_week
             if int(end_week)<10:
                 end_week="0" + end_week
-            list1_report_keyword_property = get_data_from_report_keyword_property(start_year, start_week, end_year, end_week, affiliation)
+            list1_report_keyword_property = get_data_from_report_keyword_property(start_year, start_week, end_year, end_week, affiliated_company)
             return list1_report_keyword_property
         elif continue_weeks: #开始年、开始周、结束年、结束周有1个为空时，走这个分支
             year_week = "%s-W%s" % (current_year, current_week)
@@ -199,7 +200,7 @@ def get_report_keyword_property_list():
             start_week=week_ago_start
             end_year=year_ago_end
             end_week=week_ago_end
-            list1_report_keyword_property = get_data_from_report_keyword_property(start_year, start_week, end_year, end_week, affiliation)
+            list1_report_keyword_property = get_data_from_report_keyword_property(start_year, start_week, end_year, end_week, affiliated_company)
             return list1_report_keyword_property
         else: #开始年、开始周、结束年、结束周有1个为空,持续周也为空,记录错误
             logger.error("Start_year、start_week、end_year、end_week、continue_weeks can't all null.")
@@ -210,14 +211,14 @@ def get_report_keyword_property_list():
         raise ex
 
 
-def get_data_from_report_keyword_property(para_start_year,para_start_week,para_end_year,para_end_week,para_affiliation):
+def get_data_from_report_keyword_property(para_start_year,para_start_week,para_end_year,para_end_week,para_affiliated_company):
     '''
     从[TRIAL].[dbo].[report_keyword_property]获取数据
     :param para_start_year:开始年
     :param para_start_week:开始周
     :param para_end_year:结束年
     :param para_end_week:结束周
-    :param para_affiliation:部署
+    :param para_affiliated_company:部署
     :return:表[TRIAL].[dbo].[report_keyword_property]的List
     '''
     global str_start_year_week
@@ -225,7 +226,7 @@ def get_data_from_report_keyword_property(para_start_year,para_start_week,para_e
     try:
         str_start_year_week=para_start_year + para_start_week
         str_end_year_week=para_end_year + para_end_week
-        if para_affiliation:
+        if para_affiliated_company:
             sql = " select distinct keyword as '辞書'," \
                   " free1 as '詞性'," \
                   " sum(keyword_frequency) as '頻度合計'," \
@@ -236,10 +237,10 @@ def get_data_from_report_keyword_property(para_start_year,para_start_week,para_e
                   " inner join [dbEmployee].[dbo].[mstAttribute] t3 " \
                   " on t2.EmployeeManagementID=t3.EmployeeManagementID " \
                   " where cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
-                  " and t3.Affiliation=%s " \
+                  " and t3.affiliated_company=%s " \
                   " group by keyword,free1 " \
                   " order by '重要度' desc,'頻度合計' desc" \
-                  % (str_start_year_week, str_end_year_week,para_affiliation)
+                  % (str_start_year_week, str_end_year_week,para_affiliated_company)
         else:
             sql = " select distinct keyword as '辞書'," \
                   " free1 as '詞性'," \
@@ -276,6 +277,7 @@ def no_need_keyword_remove():
     keepWordList1=[]
     keepWordList2=[]
     keepWordList3=[]
+    removeList=[]
     if report_keyword_property_list:
         try:
             for item1 in report_keyword_property_list:
@@ -283,6 +285,7 @@ def no_need_keyword_remove():
                 for mark1 in no_need_words1: #["？","?"]
                     if item1[0].find(mark1)!=-1:
                         flag1 = True
+                        removeList.append(item1[0])
                         break
                 if flag1==False:
                     keepWordList1.append(item1)
@@ -292,6 +295,7 @@ def no_need_keyword_remove():
                 for mark2 in no_need_words2: #["っ","ぁ","ぃ","ぅ","ぇ","ヶ"]
                     if item2[0].startswith(mark2) or item2[0].endswith(mark2):
                         flag2 = True
+                        removeList.append(item2[0])
                         break
                 if flag2 == False:
                     keepWordList2.append(item2)
@@ -307,6 +311,8 @@ def no_need_keyword_remove():
                         str_repeat_list = list(set(str_repeat_list)) #利用set特性去重
                         if len(str_repeat_list)>1: #不全是同一个字符则加入到List中
                             keepWordList3.append(item3)
+                        else:
+                            removeList.append(item3[0])
             return keepWordList3
         except Exception as ex:
             logger.error("Call method get_data_from_report_keyword_property() error!")
@@ -440,29 +446,30 @@ def insert_into_importance_frequency_deviation():
 
 def calculate_Intercept_X_Variable(para_list):
     '''
-    计算切片和X
+    计算Intercept,X_Variable_1,R_Square,Significance_F
     :param para_list:要处理的List
-    :return:切片和X
+    :return:Intercept,X_Variable_1,R_Square,Significance_F
     '''
     if para_list:
         try:
             df = pd.DataFrame(para_list)
             X = df.iloc[:, 5]
             y = df.iloc[:, 6]
-            X = X.values.reshape(-1, 1)
-            y = y.values.reshape(-1, 1)
+            X1 = X.values.reshape(-1, 1)
+            y1 = y.values.reshape(-1, 1)
             clf = LinearRegression()
-            clf.fit(X, y)
-            '''
-            yhat = clf.predict(X)
-            SS_Residual = sum((y - yhat) ** 2)
-            SS_Total = sum((y - np.mean(y)) ** 2)
-            r_squared = 1 - (float(SS_Residual)) / SS_Total
-            # adjusted_r_squared = 1 - (1 - r_squared) * (len(y) - 1) / (len(y) - X.shape[1] - 1)
-            '''
+            clf.fit(X1, y1)
+            yhat = clf.predict(X1)
             para_Intercept = clf.intercept_[0]
             para_X_Variable_1 = clf.coef_[0][0]
-            return para_Intercept,para_X_Variable_1
+            SS_Residual = sum((y1 - yhat) ** 2)
+            SS_Total = sum((y1 - np.mean(y1)) ** 2)
+            para_R_Square = 1 - (float(SS_Residual)) / SS_Total
+            adjusted_r_squared = 1 - (1 - para_R_Square) * (len(y1) - 1) / (len(y1) - X1.shape[1] - 1)
+            # para_a = linregress(X, y)
+            para_a = linregress(X.astype(float), y)
+            para_Significance_F = para_a[3]
+            return para_Intercept,para_X_Variable_1,para_R_Square[0],para_Significance_F
         except Exception as ex:
             logger.error("Call method calculate_Intercept_X_Variable() error!")
             logger.error("Exception:" + str(ex))
@@ -738,9 +745,8 @@ def delete_data_from_parameter():
         raise ex
 
 
-def insert_into_parameter(set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_Coefficients_Intercept,para_X_Variable_1):
+def insert_into_parameter(set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_R_Square,para_Significance_F,para_Coefficients_Intercept,para_X_Variable_1):
     '''
-    插入到表"report_parameter"
     :param set_year:生成年
     :param set_week:生成周
     :param para_keyword_frequency_avg:頻度平均
@@ -748,14 +754,15 @@ def insert_into_parameter(set_year,set_week,para_keyword_frequency_avg,para_keyw
     :param para_importance_degree_g_avg:重要度平均
     :param para_importance_degree_g_offet:重要度分類標準偏差
     :param para_adjustment:調整引数(常量)
+    :param para_R_Square:R_Square
+    :param para_Significance_F:Significance_F
     :param para_Coefficients_Intercept:切片
     :param para_X_Variable_1:X
-    :return:
     '''
     try:
-        sql = ' insert into report_parameter (report_year, report_week, keyword_frequency_avg, keyword_frequency_offet, importance_degree_g_avg, importance_degree_g_offet, adjustment, Coefficients_Intercept, Coefficients_X_Variable_1) ' \
-              ' values(%s,%s,%s,%s,%s,%s,%s,%s,%s) ' \
-              % (set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_Coefficients_Intercept,para_X_Variable_1)
+        sql = ' insert into report_parameter (report_year, report_week, keyword_frequency_avg, keyword_frequency_offet, importance_degree_g_avg, importance_degree_g_offet, adjustment, R_Square, Significance, Coefficients_Intercept, Coefficients_X_Variable_1) ' \
+              ' values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ' \
+              % (set_year,set_week,para_keyword_frequency_avg,para_keyword_frequency_offet,para_importance_degree_g_avg,para_importance_degree_g_offet,para_adjustment,para_R_Square,para_Significance_F,para_Coefficients_Intercept,para_X_Variable_1)
         cur.execute(sql)
         conn.commit()
     except pymssql.Error as ex:
@@ -785,8 +792,8 @@ if __name__=="__main__":
     keyword_frequency_offet = calculate_standard_deviation(report_keyword_property_list,2) #用"頻度合計"计算"頻度標準偏差"
     report_keyword_property_list = calculate_frequency_deviation_value() #頻度偏差値=50+(某一列的頻度合計-頻度平均)/頻度標準偏差*10,计算出这个值后加入到report_keyword_property_list中
     delete_data_from_importance_frequency_deviation() #插入到"report_importance_frequency"前先删除数据
-    list_for_calculate_Coefficients_Intercept_X_Variable_1=insert_into_importance_frequency_deviation() #插入到表"report_importance_frequency",字段"提出年"、"週"、"id"、"キーワード"、"詞性"、"頻度"、"重要度"、"頻度偏差値"
-    Coefficients_Intercept,X_Variable_1 = calculate_Intercept_X_Variable(list_for_calculate_Coefficients_Intercept_X_Variable_1) #用"頻度偏差値"和"重要度"做回帰分析,计算出"切片"(Coefficients_Intercept)和"X"(Coefficients_X_Variable_1)
+    list_for_calculate_Coefficients_Intercept_X_Variable_1=insert_into_importance_frequency_deviation() #插入到表"report_importance_frequency",字段"提出年"、"週"、"キーワード"、"詞性"、"頻度"、"重要度"、"頻度偏差値"
+    Coefficients_Intercept,X_Variable_1,R_Square,Significance_F = calculate_Intercept_X_Variable(list_for_calculate_Coefficients_Intercept_X_Variable_1) #用"頻度偏差値"和"重要度"做回帰分析,计算出"Intercept, X_Variable_1, R_Square, Significance_F"
     year_week_keyword_property_list = generate_year_week_keyword_property_list() #生成年、周、关键字、词性的List
     report_importance_classification_list = calculate_importance_classification_value(year_week_keyword_property_list) #重要度分类=重要度*X+切片,计算出这个值后加入到report_importance_classification_list中
     delete_data_from_importance_classification()  #插入到表"report_importance_classification"前删除数据
@@ -801,10 +808,10 @@ if __name__=="__main__":
     delete_data_from_employee_negative_positive() #插入到表"report_negative_positive_personal"前删除数据
     insert_into_employee_negative_positive(year_week_employee_negative_positive_list) #插入到表"重要度分類",字段"提出年"、"週"、"社員番号"、"キーワード"、"ネガ値"、"ポジ値"
     delete_data_from_parameter() #插入到表"report_parameter"前删除数据
-    insert_into_parameter(generate_year,generate_week,keyword_frequency_avg,keyword_frequency_offet,importance_degree_g_avg,importance_degree_g_offet,adjustment,Coefficients_Intercept,X_Variable_1) #插入到表"report_parameter",字段"提出年"、"週"、"頻度平均"、"頻度標準偏差"、"重要度分類平均"、"重要度分類標準偏差"、"調整引数"、"Coefficients_Intercept"、"Coefficients_X_Variable_1"
+    insert_into_parameter(generate_year,generate_week,keyword_frequency_avg,keyword_frequency_offet,importance_degree_g_avg,importance_degree_g_offet,adjustment,R_Square,Significance_F,Coefficients_Intercept,X_Variable_1) #插入到表"report_parameter",字段"提出年"、"週"、"頻度平均"、"頻度標準偏差"、"重要度分類平均"、"重要度分類標準偏差"、"調整引数"、"Coefficients_Intercept"、"Coefficients_X_Variable_1"
     logger.info("start year week:" + str_start_year_week)
     logger.info("end year week:" + str_end_year_week)
-    logger.info("affiliationk:" + affiliation)
+    logger.info("affiliated_company:" + affiliated_company)
     logger.info("continue_weeks:" + continue_weeks)
     logger.info("generate_year:" + generate_year)
     logger.info("generate_week:" + generate_week)
