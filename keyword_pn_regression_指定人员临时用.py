@@ -226,7 +226,8 @@ def get_data_from_report_keyword_property(para_start_year,para_start_week,para_e
     try:
         str_start_year_week=para_start_year + para_start_week
         str_end_year_week=para_end_year + para_end_week
-        if para_affiliated_company:
+        if para_affiliated_company:#部署有值时走这个分支
+            #如果一个词有不同词性的时候,应该放弃使用min(free1) as '詞性',改成free1 as '詞性',然后group by 的时候加上free1
             sql = " select distinct keyword as '辞書'," \
                   " min(free1) as '詞性'," \
                   " sum(keyword_frequency) as '頻度合計'," \
@@ -242,16 +243,27 @@ def get_data_from_report_keyword_property(para_start_year,para_start_week,para_e
                   " order by '重要度' desc,'頻度合計' desc" \
                   % (str_start_year_week, str_end_year_week,para_affiliated_company)
         else:
+            #全员
             sql = " select distinct keyword as '辞書'," \
                   " min(free1) as '詞性'," \
                   " sum(keyword_frequency) as '頻度合計'," \
                   " avg(importance_degree) as '重要度'" \
                   " from [TRIAL].[dbo].[report_keyword_property] " \
                   " where cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
-                  " and employee_code in (2200816, 1262, 10002513, 10068368, 10002833, 1266, 2200382, 2200358, 10046730, 10010703, 10084299, 1129, 158, 10070989, 1505, 1263, 10004307, 1261, 10060380, 10015187, 96, 10008572, 2200003, 113, 353, 127, 1128, 2200050, 2200097, 171, 774) " \
                   " group by keyword " \
                   " order by '重要度' desc,'頻度合計' desc" \
                   % (str_start_year_week, str_end_year_week)
+            #TRE
+            # sql = " select distinct keyword as '辞書'," \
+            #       " min(free1) as '詞性'," \
+            #       " sum(keyword_frequency) as '頻度合計'," \
+            #       " avg(importance_degree) as '重要度'" \
+            #       " from [TRIAL].[dbo].[report_keyword_property] " \
+            #       " where cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
+            #       " and employee_code in (2200816, 1262, 10002513, 10068368, 10002833, 1266, 2200382, 2200358, 10046730, 10010703, 10084299, 1129, 158, 10070989, 1505, 1263, 10004307, 1261, 10060380, 10015187, 96, 10008572, 2200003, 113, 353, 127, 1128, 2200050, 2200097, 171, 774) " \
+            #       " group by keyword " \
+            #       " order by '重要度' desc,'頻度合計' desc" \
+            #       % (str_start_year_week, str_end_year_week)
         cur.execute(sql)
         rows = cur.fetchall()
         if rows:
@@ -653,12 +665,23 @@ def calculate_negative_positive_value(set_year,set_week):
     '''
     if set_year and set_week:
         try:
+            # sql = " select t1.report_year as '年', " \
+            #       " t1.report_week as '週', " \
+            #       " t1.employee_code as '社員番号', " \
+            #       " SUM(CASE WHEN  t2.pn<0 THEN  t2.pn ELSE 0 END) AS 'ネガ合計', " \
+            #       " SUM(CASE WHEN t2.pn>0 THEN t2.pn ELSE 0 END) AS 'ポジ合計' " \
+            #       " from report_keyword_property t1 inner join report_negative_positive_dict t2 on t1.keyword=t2.keyword and t1.free1=t2.property " \
+            #       " where t1.report_year =%s and t1.report_week =%s " \
+            #       " and t2.report_year =%s and t2.report_week =%s " \
+            #       " group by t1.report_year,t1.report_week,t1.employee_code " \
+            #       " order by t1.report_year,t1.report_week,t1.employee_code " \
+            #       % (set_year, set_week, set_year, set_week)
             sql = " select t1.report_year as '年', " \
                   " t1.report_week as '週', " \
                   " t1.employee_code as '社員番号', " \
                   " SUM(CASE WHEN  t2.pn<0 THEN  t2.pn ELSE 0 END) AS 'ネガ合計', " \
                   " SUM(CASE WHEN t2.pn>0 THEN t2.pn ELSE 0 END) AS 'ポジ合計' " \
-                  " from report_keyword_property t1 inner join report_negative_positive_dict t2 on t1.keyword=t2.keyword and t1.free1=t2.property " \
+                  " from report_keyword_property t1 inner join report_negative_positive_dict t2 on t1.keyword=t2.keyword " \
                   " where t1.report_year =%s and t1.report_week =%s " \
                   " and t2.report_year =%s and t2.report_week =%s " \
                   " group by t1.report_year,t1.report_week,t1.employee_code " \
