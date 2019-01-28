@@ -244,26 +244,30 @@ def get_data_from_report_keyword_property(para_start_year,para_start_week,para_e
                   % (str_start_year_week, str_end_year_week,para_affiliated_company)
         else:
             #全员
-            sql = " select distinct keyword as '辞書'," \
-                  " min(free1) as '詞性'," \
-                  " sum(keyword_frequency) as '頻度合計'," \
-                  " avg(importance_degree) as '重要度'" \
-                  " from [TRIAL].[dbo].[report_keyword_property] " \
-                  " where cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
-                  " group by keyword " \
-                  " order by '重要度' desc,'頻度合計' desc" \
-                  % (str_start_year_week, str_end_year_week)
-            #TRE
             # sql = " select distinct keyword as '辞書'," \
             #       " min(free1) as '詞性'," \
             #       " sum(keyword_frequency) as '頻度合計'," \
             #       " avg(importance_degree) as '重要度'" \
             #       " from [TRIAL].[dbo].[report_keyword_property] " \
             #       " where cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
-            #       " and employee_code in (2200816, 1262, 10002513, 10068368, 10002833, 1266, 2200382, 2200358, 10046730, 10010703, 10084299, 1129, 158, 10070989, 1505, 1263, 10004307, 1261, 10060380, 10015187, 96, 10008572, 2200003, 113, 353, 127, 1128, 2200050, 2200097, 171, 774) " \
             #       " group by keyword " \
             #       " order by '重要度' desc,'頻度合計' desc" \
             #       % (str_start_year_week, str_end_year_week)
+
+            #TRE
+            sql = " select distinct keyword as '辞書'," \
+                  " min(free1) as '詞性'," \
+                  " sum(keyword_frequency) as '頻度合計'," \
+                  " avg(importance_degree) as '重要度'" \
+                  " from [TRIAL].[dbo].[report_keyword_property] " \
+                  " where (cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s " \
+                  " and employee_code in (774,2200097,113,10060380,171,1261,1505,2200816,10015187,10008572,10068368,10004307,2200050,1266,10070989,10046730,10010703,353,1262,10002513,96,127,10084299,1263,1128,2200382,158,2200003,1129,2200358,10002833,94,73,10143807,10126971,214,2200274,10084254,10115993,10084215,10046789,10114657,2200421,10116731,10057684) ) " \
+                  " or (cast(report_year as VARCHAR) + right('00' + cast(report_week as VARCHAR), 2) between %s and %s" \
+                  " and employee_code in (73, 94, 96, 100, 113, 143, 160, 169, 311, 353, 695, 1128, 1129, 1261, 1500, 1609, 2200050, 2200097, 2200358, 2200382, 2200421, 2200695, 2200816, 10004307, 10004361, 10010703, 10015187, 10015252, 10046789, 10057684, 10060815, 10066126, 10071000, 10084254, 10084299, 10090025, 10115993, 10118686, 10122954, 10122964, 10122969, 10122970, 10126971, 10137268, 10137408, 10140146) ) " \
+                  " group by keyword " \
+                  " order by '重要度' desc,'頻度合計' desc" \
+                  % (str_start_year_week, '201903','201904',str_end_year_week)
+
         cur.execute(sql)
         rows = cur.fetchall()
         if rows:
@@ -665,17 +669,20 @@ def calculate_negative_positive_value(set_year,set_week):
     '''
     if set_year and set_week:
         try:
+            #全员
             # sql = " select t1.report_year as '年', " \
             #       " t1.report_week as '週', " \
             #       " t1.employee_code as '社員番号', " \
             #       " SUM(CASE WHEN  t2.pn<0 THEN  t2.pn ELSE 0 END) AS 'ネガ合計', " \
             #       " SUM(CASE WHEN t2.pn>0 THEN t2.pn ELSE 0 END) AS 'ポジ合計' " \
-            #       " from report_keyword_property t1 inner join report_negative_positive_dict t2 on t1.keyword=t2.keyword and t1.free1=t2.property " \
+            #       " from report_keyword_property t1 inner join report_negative_positive_dict t2 on t1.keyword=t2.keyword  " \
             #       " where t1.report_year =%s and t1.report_week =%s " \
             #       " and t2.report_year =%s and t2.report_week =%s " \
             #       " group by t1.report_year,t1.report_week,t1.employee_code " \
             #       " order by t1.report_year,t1.report_week,t1.employee_code " \
             #       % (set_year, set_week, set_year, set_week)
+
+            #TRE
             sql = " select t1.report_year as '年', " \
                   " t1.report_week as '週', " \
                   " t1.employee_code as '社員番号', " \
@@ -684,9 +691,11 @@ def calculate_negative_positive_value(set_year,set_week):
                   " from report_keyword_property t1 inner join report_negative_positive_dict t2 on t1.keyword=t2.keyword " \
                   " where t1.report_year =%s and t1.report_week =%s " \
                   " and t2.report_year =%s and t2.report_week =%s " \
+                  " and t1.employee_code in (73, 94, 96, 100, 113, 143, 160, 169, 311, 353, 695, 1128, 1129, 1261, 1500, 1609, 2200050, 2200097, 2200358, 2200382, 2200421, 2200695, 2200816, 10004307, 10004361, 10010703, 10015187, 10015252, 10046789, 10057684, 10060815, 10066126, 10071000, 10084254, 10084299, 10090025, 10115993, 10118686, 10122954, 10122964, 10122969, 10122970, 10126971, 10137268, 10137408, 10140146) " \
                   " group by t1.report_year,t1.report_week,t1.employee_code " \
                   " order by t1.report_year,t1.report_week,t1.employee_code " \
                   % (set_year, set_week, set_year, set_week)
+
             cur.execute(sql)
             rows = cur.fetchall()
             if rows:
@@ -829,6 +838,13 @@ if __name__=="__main__":
     delete_data_from_pn_dictionary()  #插入到表"report_negative_positive_dict"前删除数据
     insert_into_pn_dictionary(report_keyword_pn_list) #插入到表"report_negative_positive_dict",字段"提出年"、"週"、"キーワード"、"詞性"、ネガポジ値"
     year_week_employee_negative_positive_list = calculate_negative_positive_value(generate_year,generate_week) #用生成的字典计算ネガポジ_個人別
+    ###
+    a_list =year_week_employee_negative_positive_list
+    emp_list=[i[2] for i in a_list]
+    print(datetime.datetime.now())
+    print("个人别pn合计人员数目:"+str(len(emp_list)))
+    print("个人别pn人员明细:"+str(emp_list))
+    ###
     delete_data_from_employee_negative_positive() #插入到表"report_negative_positive_personal"前删除数据
     insert_into_employee_negative_positive(year_week_employee_negative_positive_list) #插入到表"重要度分類",字段"提出年"、"週"、"社員番号"、"キーワード"、"ネガ値"、"ポジ値"
     delete_data_from_parameter() #插入到表"report_parameter"前删除数据
