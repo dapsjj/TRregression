@@ -122,7 +122,8 @@ def write_log():
         os.makedirs("log")
     # 指定logger输出格式
     formatter = logging.Formatter('%(asctime)s %(levelname)s line:%(lineno)s %(message)s')
-    file_handler = logging.FileHandler("log" + os.sep + log_file, mode='a', encoding='utf-8')
+    # file_handler = logging.FileHandler("log" + os.sep + log_file, mode='a', encoding='utf-8')
+    file_handler = logging.FileHandler(os.path.join(os.path.dirname(__file__)) + os.sep + 'log' + os.sep + log_file, mode='a', encoding='utf-8')
     file_handler.setFormatter(formatter) # 可以通过setFormatter指定输出格式
     # 为logger添加的日志处理器，可以自定义日志处理器让其输出到其他地方
     logger.addHandler(file_handler)
